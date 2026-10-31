@@ -41,6 +41,44 @@ class TransactionModel {
     this.updatedAt,
   });
 
+  TransactionModel copyWith({
+    String? id,
+    String? partyId,
+    String? partyName,
+    String? partyPhone,
+    TransactionType? type,
+    PaymentMode? paymentMode,
+    double? cashAmount,
+    String? metalType,
+    double? metalWeight,
+    String? metalPurity,
+    String? notes,
+    DateTime? date,
+    DateTime? createdAt,
+    String? createdBy,
+    String? updatedBy,
+    DateTime? updatedAt,
+  }) {
+    return TransactionModel(
+      id: id ?? this.id,
+      partyId: partyId ?? this.partyId,
+      partyName: partyName ?? this.partyName,
+      partyPhone: partyPhone ?? this.partyPhone,
+      type: type ?? this.type,
+      paymentMode: paymentMode ?? this.paymentMode,
+      cashAmount: cashAmount ?? this.cashAmount,
+      metalType: metalType ?? this.metalType,
+      metalWeight: metalWeight ?? this.metalWeight,
+      metalPurity: metalPurity ?? this.metalPurity,
+      notes: notes ?? this.notes,
+      date: date ?? this.date,
+      createdAt: createdAt ?? this.createdAt,
+      createdBy: createdBy ?? this.createdBy,
+      updatedBy: updatedBy ?? this.updatedBy,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   factory TransactionModel.fromMap(String id, Map<String, dynamic> map) {
     return TransactionModel(
       id: id,

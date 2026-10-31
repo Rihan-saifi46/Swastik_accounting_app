@@ -454,6 +454,28 @@ class TransactionNotifier extends Notifier<TransactionState> {
     }
   }
 
+  Future<bool> updateTransactionDate({
+    required TransactionModel txn,
+    required DateTime newDate,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await _transactionService.updateTransactionDate(txn.id, newDate);
+      final updatedTx = txn.copyWith(
+        date: newDate,
+        updatedBy: ref.read(currentUserProfileProvider)?.name ?? 'Staff',
+        updatedAt: TimeUtils.now,
+      );
+      ref.read(homeTransactionsProvider.notifier).replaceOptimistic(updatedTx);
+      _refreshDashboardStreams();
+      state = state.copyWith(isLoading: false, isSuccess: true);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
   Future<bool> deleteTransaction(TransactionModel transaction) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {

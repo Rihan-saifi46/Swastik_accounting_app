@@ -1635,6 +1635,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   if (ref.watch(isStaffProvider)) ...[
                                     const SizedBox(width: 6),
                                     GestureDetector(
+                                      onTap: () => _showChangeDateDialog(t),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFAF6EE),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          border: Border.all(
+                                            color: const Color(0xFFE5DEC9),
+                                            width: 1.0,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.edit_calendar_rounded,
+                                          size: 14,
+                                          color: Color(0xFF735C0F),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    GestureDetector(
                                       onTap: () => _showSetReminderDialog(t),
                                       child: Container(
                                         padding: const EdgeInsets.all(6),
@@ -2453,6 +2475,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                           ),
                                         ),
                                         if (ref.watch(isStaffProvider)) ...[
+                                    const SizedBox(width: 6),
+                                    GestureDetector(
+                                      onTap: () => _showChangeDateDialog(activity),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFAF6EE),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          border: Border.all(
+                                            color: const Color(0xFFE5DEC9),
+                                            width: 1.0,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.edit_calendar_rounded,
+                                          size: 14,
+                                          color: Color(0xFF735C0F),
+                                        ),
+                                      ),
+                                    ),
                                           const SizedBox(width: 6),
                                           GestureDetector(
                                             onTap: () => _showSetReminderDialog(
@@ -2664,6 +2708,274 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             color: Colors.white,
                           ),
                         ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showChangeDateDialog(TransactionModel txn) {
+    DateTime selectedDate = txn.date;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        bool isSaving = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final isCredit = txn.type == TransactionType.receipt || txn.type == TransactionType.metalIn;
+            final amountColor = isCredit ? const Color(0xFF01565B) : const Color(0xFFC62828);
+            final sign = isCredit ? '+ ' : '- ';
+
+            String amountStr = '';
+            if (txn.metalType.isEmpty) {
+              amountStr = '$sign₹ ${NumberFormat.decimalPattern('en_IN').format(txn.cashAmount)}';
+            } else {
+              final unit = txn.metalType == 'gold' ? 'g' : 'ct';
+              amountStr = '$sign${txn.metalWeight % 1 == 0 ? txn.metalWeight.toInt().toString() : txn.metalWeight.toStringAsFixed(3).replaceAll(RegExp(r'\.?0+$'), '')} $unit';
+            }
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFFFAF6EE),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: Color(0xFFDFBA6B), width: 1.5),
+              ),
+              title: Row(
+                children: [
+                  const Icon(Icons.edit_calendar_rounded, color: Color(0xFF735C0F), size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Change Date',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF735C0F),
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE5DEC9)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  txn.partyName,
+                                  style: GoogleFonts.montserrat(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Text(
+                                amountStr,
+                                style: GoogleFonts.montserrat(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: amountColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFAF6EE),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: const Color(0xFFDFBA6B).withOpacity(0.5)),
+                                ),
+                                child: Text(
+                                  txn.typeLabel,
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF735C0F),
+                                  ),
+                                ),
+                              ),
+                              if (txn.notes.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    txn.notes,
+                                    style: GoogleFonts.montserrat(
+                                      fontSize: 11,
+                                      color: Colors.black54,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'TRANSACTION DATE & TIME',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[600],
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFDFBA6B).withOpacity(0.5)),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        title: Text(
+                          'Selected Date & Time',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            DateFormat('dd MMM yyyy • hh:mm a').format(selectedDate),
+                            style: GoogleFonts.montserrat(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                        trailing: const Icon(
+                          Icons.calendar_today,
+                          color: Color(0xFF6B5800),
+                          size: 20,
+                        ),
+                        onTap: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (date != null) {
+                            final time = await showTimePicker(
+                              context: context,
+                              initialTime: TimeOfDay.fromDateTime(selectedDate),
+                            );
+                            if (time != null) {
+                              setDialogState(() {
+                                selectedDate = DateTime(
+                                  date.year,
+                                  date.month,
+                                  date.day,
+                                  time.hour,
+                                  time.minute,
+                                );
+                              });
+                            }
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: isSaving ? null : () => Navigator.pop(context),
+                      child: Text(
+                        'Cancel',
+                        style: GoogleFonts.montserrat(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: isSaving ? null : () async {
+                        setDialogState(() => isSaving = true);
+                        final success = await ref
+                            .read(transactionNotifierProvider.notifier)
+                            .updateTransactionDate(
+                              txn: txn,
+                              newDate: selectedDate,
+                            );
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                success
+                                    ? 'Transaction date updated successfully'
+                                    : 'Failed to update transaction date',
+                                style: GoogleFonts.montserrat(fontWeight: FontWeight.w600),
+                              ),
+                              backgroundColor: success
+                                  ? const Color(0xFF2E7D32)
+                                  : const Color(0xFFC62828),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6B5800),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      ),
+                      child: isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              'Save Date',
+                              style: GoogleFonts.montserrat(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
               ],
             );
@@ -5286,7 +5598,7 @@ class _TabletQuickAddEntryDialogState
                       icon: Icons.calendar_today_outlined,
                       text: DateFormat('dd MMM yyyy').format(_selectedDate),
                       showArrow: true,
-                      onTap: isStaff ? null : () async {
+                      onTap: () async {
                         final DateTime? picked = await showDatePicker(
                           context: context,
                           initialDate: _selectedDate,

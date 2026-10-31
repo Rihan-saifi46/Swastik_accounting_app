@@ -98,6 +98,24 @@ class TransactionService {
     }
   }
 
+  /// PATCH /api/transactions/:id/date — update ONLY the transaction date.
+  Future<void> updateTransactionDate(String id, DateTime newDate) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/transactions/$id/date'),
+      headers: _getHeaders(),
+      body: jsonEncode({'date': newDate.toUtc().toIso8601String()}),
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      try {
+        final body = jsonDecode(response.body);
+        throw Exception(body['error'] ?? 'Failed to update transaction date');
+      } catch (_) {
+        throw Exception('Failed to update transaction date (HTTP ${response.statusCode})');
+      }
+    }
+  }
+
   /// Fetches a filtered / paginated batch of transactions from the server.
   ///
   /// Every argument is optional. With no arguments this returns the full

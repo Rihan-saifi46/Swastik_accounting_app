@@ -1349,6 +1349,72 @@ app.post('/api/transactions', authenticate, async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+app.patch('/api/transactions/:id/date', authenticate, async (req, res) => {
+  try {
+    // 1. Strict payload validation: ONLY 'date' is permitted (excluding internal callerRole injected by authenticate)
+    const allowedKeys = ['date'];
+    const extraKeys = Object.keys(req.body).filter(k => k !== 'callerRole' && !allowedKeys.includes(k));
+
+    if (extraKeys.length > 0) {
+      log.warn('AUTH', 'DENIED: non-date fields in PATCH /api/transactions/:id/date', {
+        id: req.requestId,
+        txId: req.params.id,
+        extraKeys,
+        callerRole: req.body.callerRole,
+      });
+      return res.status(403).json({
+        error: `Forbidden: Only the transaction date can be modified. Unauthorized fields: ${extraKeys.join(', ')}`,
+      });
+    }
+
+    if (!req.body.date) {
+      return res.status(400).json({ error: 'Missing required field: date' });
+    }
+
+    const newDate = new Date(req.body.date);
+    if (isNaN(newDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+
+    // 2. Fetch existing transaction
+    const oldTx = await Transaction.findById(req.params.id);
+    if (!oldTx) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    const oldDate = oldTx.date;
+
+    // 3. Update ONLY the date and audit tracking
+    oldTx.date = newDate;
+    if (req.body.callerRole) {
+      oldTx.updatedBy = req.body.callerRole === 'admin' ? 'Admin' : 'Staff';
+    }
+    const updatedTx = await oldTx.save();
+
+    log.info('TXN', 'Updated transaction date', {
+      id: req.requestId,
+      txId: req.params.id,
+      oldDate,
+      newDate: updatedTx.date,
+      by: req.body.callerRole,
+    });
+
+    // 4. Trigger incremental daily balance recalculation starting from the earlier of oldDate and newDate
+    const recalcFrom = oldDate < newDate ? oldDate : newDate;
+    recalculateDailyBalances(recalcFrom)
+      .then(() => broadcastEvent('transactions_updated'))
+      .catch(err => {
+        log.error('BALANCES', 'Background recalculation failed after transaction date update', err, { txId: req.params.id });
+        broadcastEvent('transactions_updated');
+      });
+
+    res.json(updatedTx);
+  } catch (err: any) {
+    log.error('TXN', 'Error in PATCH /api/transactions/:id/date', err, { id: req.requestId, txId: req.params.id, body: req.body });
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.put('/api/transactions/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const oldTx = await Transaction.findById(req.params.id);

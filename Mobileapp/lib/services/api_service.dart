@@ -141,6 +141,20 @@ class ApiService {
   }
 
   /// PUT /api/transactions/:id — update an existing transaction.
+  /// PATCH /api/transactions/:id/date — update ONLY the transaction date.
+  Future<Map<String, dynamic>> updateTransactionDate(
+    String id,
+    DateTime newDate,
+  ) async {
+    final res = await http.patch(
+      Uri.parse('$_base/api/transactions/$id/date'),
+      headers: _getHeaders(),
+      body: jsonEncode({'date': newDate.toUtc().toIso8601String()}),
+    ).timeout(_timeout);
+    _assertOk(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> updateTransaction(
     String id,
     Map<String, dynamic> body,

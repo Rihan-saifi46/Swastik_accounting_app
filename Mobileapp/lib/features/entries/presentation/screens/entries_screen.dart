@@ -170,7 +170,7 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
                         icon: Icons.calendar_today_outlined,
                         text: DateFormat('dd MMM yyyy').format(_selectedDate),
                         showArrow: true,
-                        onTap: isStaff ? null : () async {
+                        onTap: () async {
                           final DateTime? picked = await showDatePicker(
                             context: context,
                             initialDate: _selectedDate,
