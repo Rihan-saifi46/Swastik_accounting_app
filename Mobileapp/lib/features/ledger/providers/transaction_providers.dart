@@ -17,12 +17,32 @@ final transactionsStreamProvider = StreamProvider<List<TransactionModel>>((ref) 
   return ref.watch(transactionServiceProvider).transactionsStream(AppConstants.centralDbId);
 });
 
-final partyTransactionsStreamProvider = StreamProvider.family<List<TransactionModel>, String>((ref, partyId) {
+final partyTransactionsStreamProvider = StreamProvider.autoDispose.family<List<TransactionModel>, String>((ref, partyId) {
   return ref.watch(transactionServiceProvider).partyTransactionsStream(AppConstants.centralDbId, partyId);
 });
 
-final dailyBalancesStreamProvider = StreamProvider<List<DailyClosingBalanceModel>>((ref) {
+final dailyBalancesStreamProvider = StreamProvider.autoDispose<List<DailyClosingBalanceModel>>((ref) {
   return ref.watch(transactionServiceProvider).dailyBalancesStream();
+});
+
+/// Date-scoped transaction provider for Statement screens to avoid downloading
+/// the entire multi-year transaction history when a specific date window is selected.
+final statementTransactionsProvider = FutureProvider.autoDispose.family<List<TransactionModel>, String>((ref, dateFilter) async {
+  DateTime? from;
+  DateTime? to;
+  final now = TimeUtils.now;
+  if (dateFilter == 'Today') {
+    from = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    to = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+  } else if (dateFilter == 'This Week') {
+    final weekAgo = now.subtract(const Duration(days: 7));
+    from = DateTime(weekAgo.year, weekAgo.month, weekAgo.day, 0, 0, 0);
+    to = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+  } else if (dateFilter == 'This Month') {
+    from = DateTime(now.year, now.month, 1, 0, 0, 0);
+    to = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+  }
+  return ref.watch(transactionServiceProvider).fetchTransactions(from: from, to: to);
 });
 
 /// Just the latest closing-balance row (current running totals) for the home
@@ -334,6 +354,7 @@ class TransactionNotifier extends Notifier<TransactionState> {
     ref.invalidate(dailyBalancesStreamProvider);
     ref.invalidate(latestDailyBalanceProvider);
     ref.invalidate(partiesStreamProvider);
+    ref.invalidate(statementTransactionsProvider);
     // Home's table + summary cards use in-place providers — refresh them without
     // invalidating (which would drop the active filter/paging state, or the
     // optimistic totals we just applied). Each refetch reconciles authoritatively.

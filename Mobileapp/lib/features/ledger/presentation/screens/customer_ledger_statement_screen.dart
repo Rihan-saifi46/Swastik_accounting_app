@@ -280,7 +280,7 @@ class _CustomerLedgerStatementScreenState extends ConsumerState<CustomerLedgerSt
 
   @override
   Widget build(BuildContext context) {
-    final transactionsAsync = ref.watch(transactionsStreamProvider);
+    final transactionsAsync = ref.watch(partyTransactionsStreamProvider(widget.party.id));
     final isTablet = AppResponsive.isTablet(context);
 
     // Apply Live Transaction updates if possible, else use initial

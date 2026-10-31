@@ -23,6 +23,8 @@ class RealtimeSyncNotifier extends Notifier<void> {
   Timer? _pollTimer;
   bool _active = false;
   int _retryDelayMs = 1000;
+  DateTime _lastRefreshTime = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastPartiesRefreshTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void build() {
@@ -80,7 +82,11 @@ class RealtimeSyncNotifier extends Notifier<void> {
           _refreshDashboard();
         } else if (data.contains('parties_updated')) {
           debugPrint('[RealtimeSync] parties_updated received.');
-          ref.invalidate(partiesStreamProvider);
+          final now = DateTime.now();
+          if (now.difference(_lastPartiesRefreshTime).inMilliseconds >= 1500) {
+            _lastPartiesRefreshTime = now;
+            ref.invalidate(partiesStreamProvider);
+          }
         }
       }, onError: (err) {
         debugPrint('[RealtimeSync] SSE error: $err');
@@ -116,13 +122,22 @@ class RealtimeSyncNotifier extends Notifier<void> {
   }
 
   void _refreshDashboard() {
+    final now = DateTime.now();
+    // Coalesce / debounce rapid bursts from SSE and reconnect:
+    // If a refresh was already dispatched in the last 1500ms, skip duplicate storm.
+    if (now.difference(_lastRefreshTime).inMilliseconds < 1500) {
+      debugPrint('[RealtimeSync] Skipping duplicate refresh (coalesced within 1500ms).');
+      return;
+    }
+    _lastRefreshTime = now;
+
     // A transaction affects the ledger, the day's closing balances, and the
     // involved party's running balance — refresh all three. Home reads
     // `asyncValue.value`, which Riverpod preserves across an invalidate, so the
     // UI updates in place with no loading flicker.
-    ref.invalidate(transactionsStreamProvider);
     ref.invalidate(dailyBalancesStreamProvider);
     ref.invalidate(partiesStreamProvider);
+    ref.invalidate(statementTransactionsProvider);
     // Home's table + summary totals are in-place providers (not invalidated, to
     // preserve filter/paging and avoid flicker) — refresh them so a transaction
     // made on another device shows up on this device's home immediately.

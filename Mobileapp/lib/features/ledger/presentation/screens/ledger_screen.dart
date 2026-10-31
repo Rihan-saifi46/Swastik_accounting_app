@@ -35,14 +35,12 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   Widget build(BuildContext context) {
     final isTablet = AppResponsive.isTablet(context);
     final partiesAsync = ref.watch(partiesStreamProvider);
-    final transactionsAsync = ref.watch(transactionsStreamProvider);
 
     return Container(
       color: isTablet ? const Color(0xFFFAF6EE) : const Color(0xFFFDFBF7),
       child: SafeArea(
         child: partiesAsync.when(
           data: (parties) {
-            final transactions = transactionsAsync.value ?? [];
 
             // Apply Search Query
             final query = _searchQuery.toLowerCase().trim();
@@ -75,7 +73,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                   SizedBox(height: isTablet ? 24 : 16),
                   _buildRecentActivityHeader(isTablet),
                   SizedBox(height: isTablet ? 24 : 16),
-                  _buildPartiesList(filteredParties, isTablet, transactions),
+                  _buildPartiesList(filteredParties, isTablet),
                   const SizedBox(height: 80), // Padding for bottom nav
                 ],
               ),
@@ -172,7 +170,6 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   Widget _buildPartiesList(
     List<PartyModel> filteredParties,
     bool isTablet,
-    List<TransactionModel> transactions,
   ) {
     if (filteredParties.isEmpty) {
       return Center(
@@ -203,7 +200,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
 
     return Column(
       children: filteredParties
-          .map((party) => _buildPartyCard(party, isTablet, transactions))
+          .map((party) => _buildPartyCard(party, isTablet))
           .toList(),
     );
   }
@@ -211,7 +208,6 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   Widget _buildPartyCard(
     PartyModel party,
     bool isTablet,
-    List<TransactionModel> transactions,
   ) {
 
 
@@ -385,12 +381,12 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                                 ),
                                 const SizedBox(width: 12),
                                 GestureDetector(
-                                  onTap: () {
-                                    final partyTxns = transactions
-                                        .where((t) => t.partyId == party.id)
-                                        .toList();
-                                    showCustomerLedgerPrintBottomSheet(context, party, partyTxns);
-                                  },
+                                  onTap: () async {
+                                      final partyTxns = await ref.read(transactionServiceProvider).fetchTransactions(partyId: party.id);
+                                      if (context.mounted) {
+                                        showCustomerLedgerPrintBottomSheet(context, party, partyTxns);
+                                      }
+                                    },
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
@@ -410,12 +406,12 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                                 const SizedBox(width: 8),
                               ] else ...[
                                 GestureDetector(
-                                  onTap: () {
-                                    final partyTxns = transactions
-                                        .where((t) => t.partyId == party.id)
-                                        .toList();
-                                    showCustomerLedgerPrintBottomSheet(context, party, partyTxns);
-                                  },
+                                  onTap: () async {
+                                      final partyTxns = await ref.read(transactionServiceProvider).fetchTransactions(partyId: party.id);
+                                      if (context.mounted) {
+                                        showCustomerLedgerPrintBottomSheet(context, party, partyTxns);
+                                      }
+                                    },
                                   child: Container(
                                     padding: const EdgeInsets.all(6),
                                     decoration: BoxDecoration(

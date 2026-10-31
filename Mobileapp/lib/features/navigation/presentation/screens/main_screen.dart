@@ -88,7 +88,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
       // The polling streams can be throttled/paused while the app is in the
       // background, leaving stale data on return. Force an immediate refetch so
       // the admin/staff sees the latest entries the moment they reopen the app.
-      ref.invalidate(transactionsStreamProvider);
+      ref.invalidate(statementTransactionsProvider);
       ref.invalidate(dailyBalancesStreamProvider);
       ref.invalidate(partiesStreamProvider);
       // Home table + summary totals are in-place providers — refresh them so the

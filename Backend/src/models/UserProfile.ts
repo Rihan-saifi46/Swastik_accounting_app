@@ -55,4 +55,7 @@ const userProfileSchema = new Schema<IUserProfile>(
   }
 );
 
+// Index for device session authentication lookup in POST /api/verify-session
+userProfileSchema.index({ approvedDeviceId: 1 });
+
 export const UserProfile = model<IUserProfile>('UserProfile', userProfileSchema);

@@ -979,7 +979,7 @@ app.get('/api/daily-balances/latest', async (req, res) => {
 // CRUD Routes for Parties
 app.get('/api/parties', async (req, res) => {
   try {
-    const parties = await Party.find().sort({ updatedAt: -1 });
+    const parties = await Party.find().sort({ updatedAt: -1 }).lean();
     log.debug('PARTIES', `Returning ${parties.length} parties`, { id: req.requestId });
     res.json(parties);
   } catch (err: any) {

@@ -135,7 +135,7 @@ class _TransactionStatementScreenState extends ConsumerState<TransactionStatemen
 
   @override
   Widget build(BuildContext context) {
-    final transactionsAsync = ref.watch(transactionsStreamProvider);
+    final transactionsAsync = ref.watch(statementTransactionsProvider(_dateFilter));
     final dailyBalancesAsync = ref.watch(dailyBalancesStreamProvider);
     final isTablet = AppResponsive.isTablet(context);
 
@@ -163,7 +163,6 @@ class _TransactionStatementScreenState extends ConsumerState<TransactionStatemen
             tooltip: 'Print Statement',
             onPressed: () async {
               // Extract values for dialog
-              double totalBalance = 0.0;
               final listVal = transactionsAsync.value ?? [];
               final categoryTxns = listVal.where((t) {
                 if (widget.category == 'cash') {
@@ -177,15 +176,29 @@ class _TransactionStatementScreenState extends ConsumerState<TransactionStatemen
                   return t.metalType == widget.category;
                 }
               }).toList();
-              
-              for (final t in categoryTxns) {
-                final isCredit = t.type == TransactionType.receipt || t.type == TransactionType.metalIn;
-                final isDebit = t.type == TransactionType.payment || t.type == TransactionType.metalOut;
-                final val = t.metalType.isEmpty ? t.cashAmount : t.metalWeight;
-                if (isCredit) {
-                  totalBalance += val;
-                } else if (isDebit) {
-                  totalBalance -= val;
+
+              double totalBalance = 0.0;
+              final summary = ref.read(transactionSummaryProvider).value;
+              if (summary != null) {
+                if (widget.category == 'cash') {
+                  totalBalance = summary.cash;
+                } else if (widget.category == 'online') {
+                  totalBalance = summary.online;
+                } else if (widget.category == 'gold') {
+                  totalBalance = summary.gold;
+                } else if (widget.category == 'diamond') {
+                  totalBalance = summary.diamond;
+                }
+              } else {
+                for (final t in categoryTxns) {
+                  final isCredit = t.type == TransactionType.receipt || t.type == TransactionType.metalIn;
+                  final isDebit = t.type == TransactionType.payment || t.type == TransactionType.metalOut;
+                  final val = t.metalType.isEmpty ? t.cashAmount : t.metalWeight;
+                  if (isCredit) {
+                    totalBalance += val;
+                  } else if (isDebit) {
+                    totalBalance -= val;
+                  }
                 }
               }
 
@@ -257,17 +270,30 @@ class _TransactionStatementScreenState extends ConsumerState<TransactionStatemen
             }
           }).toList();
 
-          // 2. Calculate balance dynamically
+          // 2. Calculate balance dynamically (read live summary totals)
           double balance = 0.0;
-          for (final t in categoryTxns) {
-            final isCredit = t.type == TransactionType.receipt || t.type == TransactionType.metalIn;
-            final isDebit = t.type == TransactionType.payment || t.type == TransactionType.metalOut;
-            final val = t.metalType.isEmpty ? t.cashAmount : t.metalWeight;
+          final summary = ref.watch(transactionSummaryProvider).value;
+          if (summary != null) {
+            if (widget.category == 'cash') {
+              balance = summary.cash;
+            } else if (widget.category == 'online') {
+              balance = summary.online;
+            } else if (widget.category == 'gold') {
+              balance = summary.gold;
+            } else if (widget.category == 'diamond') {
+              balance = summary.diamond;
+            }
+          } else {
+            for (final t in categoryTxns) {
+              final isCredit = t.type == TransactionType.receipt || t.type == TransactionType.metalIn;
+              final isDebit = t.type == TransactionType.payment || t.type == TransactionType.metalOut;
+              final val = t.metalType.isEmpty ? t.cashAmount : t.metalWeight;
 
-            if (isCredit) {
-              balance += val;
-            } else if (isDebit) {
-              balance -= val;
+              if (isCredit) {
+                balance += val;
+              } else if (isDebit) {
+                balance -= val;
+              }
             }
           }
 

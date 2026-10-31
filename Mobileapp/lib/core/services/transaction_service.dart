@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -140,43 +141,79 @@ class TransactionService {
     return list;
   }
 
-  Stream<List<TransactionModel>> transactionsStream(String userId) async* {
-    while (true) {
+  Stream<List<TransactionModel>> transactionsStream(String userId) {
+    late StreamController<List<TransactionModel>> controller;
+    Timer? timer;
+
+    Future<void> poll() async {
       try {
         final res = await http.get(
           Uri.parse('$baseUrl/transactions'),
           headers: _getHeaders(),
         ).timeout(const Duration(seconds: 10));
-        if (res.statusCode == 200) {
+        if (res.statusCode == 200 && !controller.isClosed) {
           final List data = jsonDecode(res.body);
           final list = data.map((e) => TransactionModel.fromMap(e['_id'], e as Map<String, dynamic>)).toList();
           list.sort((a, b) => b.date.compareTo(a.date));
-          yield list;
+          controller.add(list);
         }
-      } catch (e) {
+      } catch (_) {
         // Keep the polling stream alive; the next cycle will retry.
       }
-      await Future.delayed(const Duration(seconds: 12));
     }
+
+    controller = StreamController<List<TransactionModel>>(
+      onListen: () {
+        poll();
+        timer = Timer.periodic(const Duration(seconds: 12), (_) => poll());
+      },
+      onCancel: () {
+        timer?.cancel();
+        controller.close();
+      },
+    );
+
+    return controller.stream;
   }
 
-  Stream<List<TransactionModel>> partyTransactionsStream(String userId, String partyId) async* {
+  Stream<List<TransactionModel>> partyTransactionsStream(String userId, String partyId) {
     // Filter by partyId on the server (uses the {partyId, date} index) instead of
     // downloading every transaction and filtering on the device each cycle.
-    while (true) {
+    late StreamController<List<TransactionModel>> controller;
+    Timer? timer;
+
+    Future<void> poll() async {
       try {
-        yield await fetchTransactions(partyId: partyId);
-      } catch (e) {
+        final list = await fetchTransactions(partyId: partyId);
+        if (!controller.isClosed) {
+          controller.add(list);
+        }
+      } catch (_) {
         // Keep the polling stream alive; the next cycle will retry.
       }
-      await Future.delayed(const Duration(seconds: 12));
     }
+
+    controller = StreamController<List<TransactionModel>>(
+      onListen: () {
+        poll();
+        timer = Timer.periodic(const Duration(seconds: 12), (_) => poll());
+      },
+      onCancel: () {
+        timer?.cancel();
+        controller.close();
+      },
+    );
+
+    return controller.stream;
   }
 
   /// Polls just the latest closing-balance row (current running totals) for the
   /// home summary cards — a single tiny document instead of the whole history.
-  Stream<DailyClosingBalanceModel?> latestDailyBalanceStream() async* {
-    while (true) {
+  Stream<DailyClosingBalanceModel?> latestDailyBalanceStream() {
+    late StreamController<DailyClosingBalanceModel?> controller;
+    Timer? timer;
+
+    Future<void> poll() async {
       try {
         final res = await http
             .get(
@@ -184,36 +221,62 @@ class TransactionService {
               headers: _getHeaders(),
             )
             .timeout(const Duration(seconds: 10));
-        if (res.statusCode == 200) {
+        if (res.statusCode == 200 && !controller.isClosed) {
           final dynamic data = jsonDecode(res.body);
-          yield data == null
+          controller.add(data == null
               ? null
-              : DailyClosingBalanceModel.fromMap(data as Map<String, dynamic>);
+              : DailyClosingBalanceModel.fromMap(data as Map<String, dynamic>));
         }
-      } catch (e) {
+      } catch (_) {
         // Keep the polling stream alive; the next cycle will retry.
       }
-      await Future.delayed(const Duration(seconds: 12));
     }
+
+    controller = StreamController<DailyClosingBalanceModel?>(
+      onListen: () {
+        poll();
+        timer = Timer.periodic(const Duration(seconds: 12), (_) => poll());
+      },
+      onCancel: () {
+        timer?.cancel();
+        controller.close();
+      },
+    );
+
+    return controller.stream;
   }
 
-  Stream<List<DailyClosingBalanceModel>> dailyBalancesStream() async* {
-    while (true) {
+  Stream<List<DailyClosingBalanceModel>> dailyBalancesStream() {
+    late StreamController<List<DailyClosingBalanceModel>> controller;
+    Timer? timer;
+
+    Future<void> poll() async {
       try {
         final res = await http.get(
           Uri.parse('$baseUrl/daily-balances'),
           headers: _getHeaders(),
         ).timeout(const Duration(seconds: 10));
-        if (res.statusCode == 200) {
+        if (res.statusCode == 200 && !controller.isClosed) {
           final List data = jsonDecode(res.body);
           final list = data.map((e) => DailyClosingBalanceModel.fromMap(e as Map<String, dynamic>)).toList();
-          yield list;
+          controller.add(list);
         }
-      } catch (e) {
+      } catch (_) {
         // Keep the polling stream alive; the next cycle will retry.
       }
-      await Future.delayed(const Duration(seconds: 12));
     }
+
+    controller = StreamController<List<DailyClosingBalanceModel>>(
+      onListen: () {
+        poll();
+        timer = Timer.periodic(const Duration(seconds: 12), (_) => poll());
+      },
+      onCancel: () {
+        timer?.cancel();
+        controller.close();
+      },
+    );
+
+    return controller.stream;
   }
 }
-

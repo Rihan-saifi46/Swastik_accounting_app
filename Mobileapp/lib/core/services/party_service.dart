@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/party_model.dart';
@@ -22,19 +23,34 @@ class PartyService {
   }
 
   // ─── GET PARTIES STREAM ─────────────────────────────────────────────
-  Stream<List<PartyModel>> partiesStream(String userId) async* {
-    while (true) {
+  Stream<List<PartyModel>> partiesStream(String userId) {
+    late StreamController<List<PartyModel>> controller;
+    Timer? timer;
+
+    Future<void> poll() async {
       try {
         final response = await http.get(Uri.parse('$baseUrl/parties'));
-        if (response.statusCode == 200) {
+        if (response.statusCode == 200 && !controller.isClosed) {
           final List<dynamic> data = jsonDecode(response.body);
-          yield data.map((e) => PartyModel.fromMap(e['_id'], e as Map<String, dynamic>)).toList();
+          controller.add(data.map((e) => PartyModel.fromMap(e['_id'], e as Map<String, dynamic>)).toList());
         }
-      } catch (e) {
+      } catch (_) {
         // Silently ignore network errors in polling
       }
-      await Future.delayed(const Duration(seconds: 12));
     }
+
+    controller = StreamController<List<PartyModel>>(
+      onListen: () {
+        poll();
+        timer = Timer.periodic(const Duration(seconds: 12), (_) => poll());
+      },
+      onCancel: () {
+        timer?.cancel();
+        controller.close();
+      },
+    );
+
+    return controller.stream;
   }
 
   // ─── UPDATE PARTY ──────────────────────────────────────────────────

@@ -34,4 +34,7 @@ const PartySchema: Schema = new Schema({
   timestamps: true
 });
 
+// Index for the primary sort query in GET /api/parties
+PartySchema.index({ updatedAt: -1 });
+
 export const Party = mongoose.model<IParty>('Party', PartySchema);
