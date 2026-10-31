@@ -49,16 +49,19 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
     _selectedDate = TimeUtils.now;
     _selectedTime = TimeOfDay.fromDateTime(TimeUtils.now);
 
-    // Set up a 1-second periodic timer to tick the synced server clock live in the UI
-    _clockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    // Update time when the minute/hour changes, avoiding 60 full-screen rebuilds per minute
+    _clockTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (mounted) {
-        setState(() {
-          final now = TimeUtils.now;
-          if (!_isTimeManuallySet) {
-            _selectedDate = now;
-          }
-          _selectedTime = TimeOfDay.fromDateTime(now);
-        });
+        final now = TimeUtils.now;
+        final newTime = TimeOfDay.fromDateTime(now);
+        if (newTime.minute != _selectedTime.minute || newTime.hour != _selectedTime.hour) {
+          setState(() {
+            if (!_isTimeManuallySet) {
+              _selectedDate = now;
+            }
+            _selectedTime = newTime;
+          });
+        }
       }
     });
   }

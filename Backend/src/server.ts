@@ -280,7 +280,7 @@ app.post('/api/verify', async (req: Request, res: Response) => {
 app.get('/api/devices', async (req: Request, res: Response) => {
   try {
     const now = new Date();
-    
+
     // Auto-expire sessions
     if (isMongoConnected) {
       await UserProfile.updateMany(
@@ -299,7 +299,7 @@ app.get('/api/devices', async (req: Request, res: Response) => {
 
     const activeProfiles: any[] = [];
     if (isMongoConnected) {
-      const profiles = await UserProfile.find({ sessionActive: true });
+      const profiles = await UserProfile.find({ sessionActive: true }).lean();
       profiles.forEach(profile => {
         activeProfiles.push({
           id: profile._id.toString(),
@@ -308,7 +308,7 @@ app.get('/api/devices', async (req: Request, res: Response) => {
           brand: profile.approvedDeviceBrand || (profile.deviceInfo.platform === 'android' ? 'Android' : (profile.deviceInfo.platform === 'ios' ? 'iOS' : 'Device')),
           model: profile.approvedDeviceModel || profile.deviceInfo.deviceModel || 'Staff Device',
           androidId: profile.approvedDeviceId || `profile_${profile._id.toString()}`,
-          lastActive: profile.lastApprovalTime 
+          lastActive: profile.lastApprovalTime
             ? `Active since ${new Date(profile.lastApprovalTime).toLocaleTimeString()}`
             : 'Active Now'
         });
@@ -323,7 +323,7 @@ app.get('/api/devices', async (req: Request, res: Response) => {
             brand: profile.approvedDeviceBrand || (profile.deviceInfo.platform === 'android' ? 'Android' : (profile.deviceInfo.platform === 'ios' ? 'iOS' : 'Device')),
             model: profile.approvedDeviceModel || profile.deviceInfo.deviceModel || 'Staff Device',
             androidId: profile.approvedDeviceId || `profile_${profile._id}`,
-            lastActive: profile.lastApprovalTime 
+            lastActive: profile.lastApprovalTime
               ? `Active since ${new Date(profile.lastApprovalTime).toLocaleTimeString()}`
               : 'Active Now'
           });
@@ -382,8 +382,8 @@ app.delete('/api/devices/:id', async (req: Request, res: Response) => {
         androidId: { $regex: new RegExp(`^${escapeRegex(id)}$`, 'i') },
       });
       if (deletedAdmin) {
-         log.warn('DEVICES', 'Deauthorized ADMIN device via session deletion', { id: req.requestId, androidId: id, brand: deletedAdmin.brand, model: deletedAdmin.model });
-         return res.json({ success: true, message: 'Admin device logged out successfully.' });
+        log.warn('DEVICES', 'Deauthorized ADMIN device via session deletion', { id: req.requestId, androidId: id, brand: deletedAdmin.brand, model: deletedAdmin.model });
+        return res.json({ success: true, message: 'Admin device logged out successfully.' });
       }
     } else {
       const initialLength = fallbackAdmins.length;
@@ -391,8 +391,8 @@ app.delete('/api/devices/:id', async (req: Request, res: Response) => {
         (admin) => admin.androidId.toLowerCase() !== id.toLowerCase()
       );
       if (initialLength > fallbackAdmins.length) {
-         log.warn('DEVICES', 'Deauthorized fallback ADMIN device via session deletion', { id: req.requestId, androidId: id });
-         return res.json({ success: true, message: 'Admin device logged out successfully.' });
+        log.warn('DEVICES', 'Deauthorized fallback ADMIN device via session deletion', { id: req.requestId, androidId: id });
+        return res.json({ success: true, message: 'Admin device logged out successfully.' });
       }
     }
 
@@ -407,39 +407,10 @@ app.delete('/api/devices/:id', async (req: Request, res: Response) => {
 // CRUD/API endpoints for User Profiles
 app.get('/api/user-profiles', async (req: Request, res: Response) => {
   try {
-    const fiveMinutesAgo = new Date(Date.now() - 300000);
     if (isMongoConnected) {
-      // Proactively clean up expired requests and expired sessions in DB
-      const now = new Date();
-      await UserProfile.updateMany(
-        {
-          status: 'pending_approval',
-          requestedAt: { $lt: fiveMinutesAgo }
-        },
-        {
-          status: 'inactive',
-          requestPending: false
-        }
-      );
-      await UserProfile.updateMany(
-        { sessionActive: true, expiresAt: { $lt: now } },
-        { sessionActive: false, status: 'inactive' }
-      );
-      const profiles = await UserProfile.find().sort({ createdAt: -1 });
+      const profiles = await UserProfile.find().sort({ createdAt: -1 }).lean();
       res.json(profiles);
     } else {
-      // Proactively clean up expired requests in fallback memory
-      const now = Date.now();
-      fallbackUserProfiles.forEach((p) => {
-        if (p.status === 'pending_approval' && p.requestedAt) {
-          const requestedTime = new Date(p.requestedAt).getTime();
-          if (now - requestedTime > 300000) {
-            p.status = 'inactive';
-            p.requestPending = false;
-            p.updatedAt = new Date();
-          }
-        }
-      });
       res.json(fallbackUserProfiles);
     }
   } catch (err: any) {
@@ -1519,7 +1490,7 @@ app.delete('/api/reminders/:id', async (req, res) => {
 // CRUD Routes for Appointments
 app.get('/api/appointments', async (req, res) => {
   try {
-    const appointments = await Appointment.find().sort({ date: 1 });
+    const appointments = await Appointment.find().sort({ date: 1 }).lean();
     log.debug('APPTS', `Returning ${appointments.length} appointment(s)`, { id: req.requestId });
     res.json(appointments);
   } catch (err: any) {

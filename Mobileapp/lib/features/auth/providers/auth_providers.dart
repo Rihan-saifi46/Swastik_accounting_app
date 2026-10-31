@@ -222,21 +222,13 @@ class AuthNotifier extends Notifier<AuthStatus> {
       }
     }
 
-    // Start polling the backend for session status
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+    // Start polling the backend for session status via targeted verify-session
+    // (avoids fetching all profiles and causing UI rebuilds on userProfilesNotifierProvider)
+    _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) async {
       try {
-        await ref.read(userProfilesNotifierProvider.notifier).fetchProfiles();
-        final profilesState = ref.read(userProfilesNotifierProvider);
-
-        final updatedProfile = profilesState.profiles.firstWhere(
-          (p) => p.id == profile.id,
-          orElse: () => profile,
-        );
-
-        if (!updatedProfile.sessionActive || updatedProfile.status == 'inactive') {
-          // Only log out after two consecutive authoritative "inactive" reads,
-          // so a single stale/blip response can't kick an active session. (A
-          // failed fetch keeps the old active profile, so it won't count here.)
+        final sessionData = await ref.read(authServiceProvider).verifyStaffSession(DeviceIdentity.androidId);
+        if (sessionData == null) {
+          // Authoritative "inactive" response from server
           _invalidReads++;
           if (_invalidReads >= 2) {
             debugPrint('[AuthNotifier] Session invalidated remotely (confirmed). Logging out.');
@@ -244,15 +236,18 @@ class AuthNotifier extends Notifier<AuthStatus> {
           }
         } else {
           _invalidReads = 0;
-          if (_localLastApprovalTime != null &&
-              updatedProfile.lastApprovalTime != null &&
-              updatedProfile.lastApprovalTime!.isAfter(_localLastApprovalTime!)) {
-            debugPrint('[AuthNotifier] New device approved. Logging out old device.');
-            logoutLocal();
+          final profileData = sessionData['profile'];
+          if (profileData != null && profileData['lastApprovalTime'] != null && _localLastApprovalTime != null) {
+            final remoteApproval = DateTime.tryParse(profileData['lastApprovalTime'].toString());
+            if (remoteApproval != null && remoteApproval.isAfter(_localLastApprovalTime!)) {
+              debugPrint('[AuthNotifier] New device approved. Logging out old device.');
+              logoutLocal();
+            }
           }
         }
       } catch (e) {
-        debugPrint('[AuthNotifier] Polling error: $e');
+        // Inconclusive network error / blip: do not increment _invalidReads
+        debugPrint('[AuthNotifier] Staff session check inconclusive: $e');
       }
     });
   }
