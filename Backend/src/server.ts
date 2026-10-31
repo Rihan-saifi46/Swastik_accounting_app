@@ -854,10 +854,36 @@ export async function recalculateDailyBalances(fromDate?: Date): Promise<void> {
       txByDate[dStr].push(tx);
     }
 
-    // 3. Loop from start date to today and upsert balances
+    // 3. Determine the latest relevant transaction date across the dataset
+    let latestTxDate: Date | null = null;
+    if (txsFromStart.length > 0) {
+      latestTxDate = txsFromStart[txsFromStart.length - 1].date;
+    } else {
+      const latestOverallTx = await Transaction.findOne().sort({ date: -1 }).lean();
+      latestTxDate = latestOverallTx ? latestOverallTx.date : null;
+    }
+
+    if (!latestTxDate) {
+      // No transactions exist anywhere in the database — clear closing balances
+      await DailyClosingBalance.deleteMany({});
+      log.info('BALANCES', 'No transactions remaining in database — cleared all daily closing balances.');
+      return;
+    }
+
+    const lastISTStr = getISTDateString(latestTxDate);
+    // Remove any orphaned closing balance rows that exist past the latest transaction date
+    await DailyClosingBalance.deleteMany({ date: { $gt: lastISTStr } });
+
+    // If the recalculation starting day is already past the latest transaction date,
+    // future orphaned records were pruned above; nothing more to calculate.
+    if (startDateStr > lastISTStr) {
+      log.info('BALANCES', `Recalculation start date ${startDateStr} is past latest transaction ${lastISTStr}. Cleaned future records.`);
+      return;
+    }
+
     const current = new Date(Date.UTC(yyyy, mm - 1, dd));
-    const end = new Date(new Date().getTime() + istOffset);
-    end.setUTCHours(0, 0, 0, 0);
+    const [endY, endM, endD] = lastISTStr.split('-').map(Number);
+    const end = new Date(Date.UTC(endY, endM - 1, endD));
 
     while (current.getTime() <= end.getTime()) {
       const cyyyy = current.getUTCFullYear();
@@ -921,7 +947,7 @@ export async function recalculateDailyBalances(fromDate?: Date): Promise<void> {
 app.get('/api/daily-balances', async (req, res) => {
   try {
     if (isMongoConnected) {
-      const balances = await DailyClosingBalance.find().sort({ date: 1 });
+      const balances = await DailyClosingBalance.find().sort({ date: 1 }).lean();
       res.json(balances);
     } else {
       res.json(fallbackDailyClosingBalances);
@@ -1339,13 +1365,13 @@ app.post('/api/transactions', authenticate, async (req, res) => {
         id: req.requestId, txId: savedTx._id, partyId: savedTx.partyId,
       });
     }
-    // Push the new transaction to every connected client immediately (the tx and
-    // the party balance are already committed above), then push again once the
-    // background daily-balance recalculation finishes so the balance cards catch up.
-    broadcastEvent('transactions_updated');
+    // Broadcast update once daily balances have finished recalculating.
     recalculateDailyBalances(savedTx.date)
       .then(() => broadcastEvent('transactions_updated'))
-      .catch(err => log.error('BALANCES', 'Background recalculation failed after transaction create', err, { txId: savedTx._id }));
+      .catch(err => {
+        log.error('BALANCES', 'Background recalculation failed after transaction create', err, { txId: savedTx._id });
+        broadcastEvent('transactions_updated');
+      });
     res.status(201).json(savedTx);
   } catch (err: any) {
     log.error('TXN', 'Error in POST /api/transactions', err, { id: req.requestId, body: req.body });
@@ -1387,10 +1413,12 @@ app.put('/api/transactions/:id', authenticate, requireAdmin, async (req, res) =>
     }
     // Run incremental recalculation from the earlier of old/new date
     const recalcFrom = oldTx && updatedTx ? (oldTx.date < updatedTx.date ? oldTx.date : updatedTx.date) : undefined;
-    broadcastEvent('transactions_updated');
     recalculateDailyBalances(recalcFrom)
       .then(() => broadcastEvent('transactions_updated'))
-      .catch(err => log.error('BALANCES', 'Background recalculation failed after transaction update', err, { txId: req.params.id }));
+      .catch(err => {
+        log.error('BALANCES', 'Background recalculation failed after transaction update', err, { txId: req.params.id });
+        broadcastEvent('transactions_updated');
+      });
     res.json(updatedTx);
   } catch (err: any) {
     log.error('TXN', 'Error in PUT /api/transactions/:id', err, { id: req.requestId, txId: req.params.id, body: req.body });
@@ -1426,10 +1454,12 @@ app.delete('/api/transactions/:id', authenticate, requireAdmin, async (req, res)
       log.warn('TXN', 'Delete targeted a transaction that does not exist', { id: req.requestId, txId: req.params.id });
     }
     // Run incremental recalculation from the deleted transaction's date
-    broadcastEvent('transactions_updated');
     recalculateDailyBalances(deleteDate)
       .then(() => broadcastEvent('transactions_updated'))
-      .catch(err => log.error('BALANCES', 'Background recalculation failed after transaction delete', err, { txId: req.params.id }));
+      .catch(err => {
+        log.error('BALANCES', 'Background recalculation failed after transaction delete', err, { txId: req.params.id });
+        broadcastEvent('transactions_updated');
+      });
     res.json({ message: 'Transaction deleted successfully' });
   } catch (err: any) {
     log.error('TXN', 'Error in DELETE /api/transactions/:id', err, { id: req.requestId, txId: req.params.id });
