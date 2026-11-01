@@ -24,7 +24,7 @@ class TransactionStatementScreen extends ConsumerStatefulWidget {
 
 class _TransactionStatementScreenState extends ConsumerState<TransactionStatementScreen> {
   String _typeFilter = 'All'; // 'All', 'IN', 'OUT'
-  String _dateFilter = 'All Time'; // 'All Time', 'Today', 'This Week', 'This Month'
+  String _dateFilter = 'This Month'; // 'This Month', 'Today', 'This Week', 'All Time'
 
   String get _periodPrintLabel {
     final now = TimeUtils.now;
@@ -136,7 +136,6 @@ class _TransactionStatementScreenState extends ConsumerState<TransactionStatemen
   @override
   Widget build(BuildContext context) {
     final transactionsAsync = ref.watch(statementTransactionsProvider(_dateFilter));
-    final dailyBalancesAsync = ref.watch(dailyBalancesStreamProvider);
     final isTablet = AppResponsive.isTablet(context);
 
     return Scaffold(
@@ -490,7 +489,7 @@ class _TransactionStatementScreenState extends ConsumerState<TransactionStatemen
                               fontWeight: FontWeight.w600,
                               color: const Color(0xFF5E543F),
                             ),
-                            items: <String>['All Time', 'Today', 'This Week', 'This Month'].map((String value) {
+                            items: <String>['This Month', 'This Week', 'Today', 'All Time'].map((String value) {
                               return DropdownMenuItem<String>(
                                 value: value,
                                 child: Text(value),
@@ -553,45 +552,20 @@ class _TransactionStatementScreenState extends ConsumerState<TransactionStatemen
                               headerText = DateFormat('EEEE, d MMM yyyy').format(parsedDate);
                             }
 
-                            // Calculate daily closing balance for dateKey
+                            // Calculate daily closing balance for dateKey dynamically from category transactions
                             double closingVal = 0.0;
-                            bool hasSavedBalance = false;
-
-                            if (dailyBalancesAsync.hasValue) {
-                              final dailyBalances = dailyBalancesAsync.value ?? [];
-                              final matches = dailyBalances.where((b) => b.date == dateKey);
-                              final matchingBalance = matches.isNotEmpty ? matches.first : null;
-                              if (matchingBalance != null) {
-                                hasSavedBalance = true;
-                                if (widget.category == 'cash') {
-                                  closingVal = matchingBalance.closingCash;
-                                } else if (widget.category == 'online') {
-                                  closingVal = matchingBalance.closingOnline;
-                                } else if (widget.category == 'gold') {
-                                  closingVal = matchingBalance.closingGold;
-                                } else if (widget.category == 'diamond') {
-                                  closingVal = matchingBalance.closingDiamond;
+                            for (final t in categoryTxns) {
+                              final tDateStr = DateFormat('yyyy-MM-dd').format(t.date);
+                              if (tDateStr.compareTo(dateKey) <= 0) {
+                                final isCredit = t.type == TransactionType.receipt || t.type == TransactionType.metalIn;
+                                final isDebit = t.type == TransactionType.payment || t.type == TransactionType.metalOut;
+                                final val = t.metalType.isEmpty ? t.cashAmount : t.metalWeight;
+                                if (isCredit) {
+                                  closingVal += val;
+                                } else if (isDebit) {
+                                  closingVal -= val;
                                 }
                               }
-                            }
-
-                            if (!hasSavedBalance) {
-                              // Dynamic fallback calculation: sum all category transactions occurring on or before dateKey
-                              double runningSum = 0.0;
-                              for (final t in categoryTxns) {
-                                final tDateStr = DateFormat('yyyy-MM-dd').format(t.date);
-                                if (tDateStr.compareTo(dateKey) <= 0) {
-                                  final isCredit = t.type == TransactionType.receipt || t.type == TransactionType.metalIn;
-                                  final isDebit = t.type == TransactionType.payment || t.type == TransactionType.metalOut;
-                                  final val = t.metalType.isEmpty ? t.cashAmount : t.metalWeight;
-                                  if (isCredit) {
-                                    runningSum += val;
-                                  } else if (isDebit) {
-                                    runningSum -= val;
-                                  }
-                                }
-                              }
-                              closingVal = runningSum;
                             }
 
                             final isToday = dateKey == todayStr;

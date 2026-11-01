@@ -30,6 +30,7 @@ final dailyBalancesStreamProvider = StreamProvider.autoDispose<List<DailyClosing
 final statementTransactionsProvider = FutureProvider.autoDispose.family<List<TransactionModel>, String>((ref, dateFilter) async {
   DateTime? from;
   DateTime? to;
+  int? limit;
   final now = TimeUtils.now;
   if (dateFilter == 'Today') {
     from = DateTime(now.year, now.month, now.day, 0, 0, 0);
@@ -41,8 +42,12 @@ final statementTransactionsProvider = FutureProvider.autoDispose.family<List<Tra
   } else if (dateFilter == 'This Month') {
     from = DateTime(now.year, now.month, 1, 0, 0, 0);
     to = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+  } else {
+    // 'All Time' — cap to the 200 most recent transactions to prevent downloading
+    // the entire multi-year database and freezing the UI on mobile networks.
+    limit = 200;
   }
-  return ref.watch(transactionServiceProvider).fetchTransactions(from: from, to: to);
+  return ref.watch(transactionServiceProvider).fetchTransactions(from: from, to: to, limit: limit);
 });
 
 /// Just the latest closing-balance row (current running totals) for the home
